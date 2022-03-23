@@ -45,7 +45,7 @@ As with the first part of this assignment, you should accept input programs from
 
 Example #1
 Input:
-
+```
 name()  {
     "John"
 }
@@ -82,9 +82,10 @@ public class Main {
         return first_name + sep + last_name;
     }
 }
+```
 Example #2
 Input:
-
+```
 name() {
     "John"
 }
@@ -106,9 +107,10 @@ cond_repeat(c, x) {
 
 cond_repeat("yes", name())
 cond_repeat("no", "Jane")
+```
 Example #3
 Input:
-
+```
 findLangType(langName) {
     if ("Java" prefix langName)
         if(langName prefix "Java")
@@ -128,3 +130,4 @@ findLangType(langName) {
 findLangType("Java")
 findLangType("Javascript")
 findLangType("Typescript")
+```
