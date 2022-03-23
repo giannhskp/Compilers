@@ -1,0 +1,151 @@
+/**
+ *  Package and Import Specifications
+ */
+import java_cup.runtime.*;
+
+/**
+ *  Usercode Components
+ */
+parser code {:
+    // Connect this parser to a scanner!
+    Scanner s;
+    Parser(Scanner s){ this.s=s; }
+:}
+
+/* define how to connect to the scanner! */
+scan with {: return s.next_token(); :};
+
+/**
+ *  Symbol Lists
+ */
+
+/* Terminals (tokens returned by the scanner). */
+terminal            PLUS, COMMA, LPAREN, RPAREN, RBRACK,IF,ELSE,PREFIX, SUFFIX, PARBRACK;
+terminal String    STRING_LITERAL,IDENTIFIER;
+
+/*  Non terminals */
+non terminal   program;
+non terminal String funDefs, functionDefinition, funPrototype, funPrototypeTail, fdArguments, block;
+non terminal String insidefunctionCall,insidefcArguments,insidefunctionCallTail;
+non terminal String ifElse, condition, condTail;
+non terminal String funCalls, functionCall, functionCallTail, fcArguments;
+non terminal String expression,callArguments;
+non terminal String fcIfElse,fcCondition,fcCondTail;
+non terminal String topLevelExpr;
+
+
+
+/**
+ *  Precedence Declarations
+ */
+ precedence left IF, ELSE;
+ precedence left PREFIX, SUFFIX;
+ precedence left PLUS;
+
+
+/**
+ *  The Grammar Rules
+ */
+start with program;
+/* the input consists from the definition dection (funDefs) and the call section (funCalls) */
+program ::= funDefs:fd funCalls:fc {: System.out.println("public class Main{\n\tpublic static void main(String[] args){ \n " + fc + "\t}"+ fd +"\n}"); :}
+;
+
+/* Accepts 0 or more function definitions */
+funDefs ::= funDefs:otherDefs functionDefinition:def    {: RESULT = otherDefs + def; :}
+          | /* empty */ {: RESULT = ""; :}
+;
+/* A function definition consists of 2 parts funPrototype and block */
+functionDefinition ::= funPrototype:type block:b {: RESULT = "\n\n\tpublic static String " + type + b; :}
+;
+
+/* funPrototype consists of the function name (funName), a left parenthesis and  funPrototypeTail */
+funPrototype ::= IDENTIFIER:funName LPAREN funPrototypeTail:tail   {: RESULT = funName + "(" + tail; :}
+;
+
+/* funPrototypeTail consists of 0 or more arguments (fdArguments) followed by ')' and '{' (PARBRACK) */
+funPrototypeTail ::= fdArguments:argList PARBRACK {: RESULT = argList + "){"; :}
+                  | PARBRACK {: RESULT = "){"; :}
+;
+/* As arguments we only accept IDENTIFIER. So every other type of argument (ex. STRING_LITERAL) is considered as parse error */
+/* Multiple arguments are separated by COMMA*/
+fdArguments ::= IDENTIFIER:arg COMMA  fdArguments:argList    {: RESULT = "String " + arg + ", " + argList; :}
+                | IDENTIFIER:arg   {: RESULT = "String " + arg; :}
+;
+
+/* The block contains the expression returned from the defined function followed by a '}' (RBRACK) */
+block ::= expression:expr RBRACK {: RESULT ="\n\t\t return " + expr + ";\n\t}"; :}
+;
+
+/* expression contains all the valid expressions that can exist inside a defined function */
+expression ::= STRING_LITERAL:string {: RESULT = "\"" + string + "\""; :}
+              | insidefunctionCall:call {: RESULT = call; :}
+              | IDENTIFIER:id {: RESULT = id; :}
+              | ifElse:ie {: RESULT = ie; :}
+              | expression:e1 PLUS expression:e2 {: RESULT = e1 + " + " + e2; :}
+;
+/* insidefunctionCall is a function call that we can find *ONLY* inside a function declaration */
+/* It differs from a call from the CALL SECTION, as insidefunctionCall accepts IDENTIFIERs as arguments */
+insidefunctionCall  ::= IDENTIFIER:funName LPAREN insidefunctionCallTail:tail {: RESULT = funName + "(" + tail; :}
+;
+
+/* inside the parenthesis we can have 0 or more arguments */
+insidefunctionCallTail ::= insidefcArguments:args RPAREN {: RESULT = args + ")"; :}
+              |    RPAREN {: RESULT = ")"; :}
+;
+/* the arguments can be any type that is defined in expression */
+insidefcArguments ::= insidefcArguments:fcargs COMMA expression:e  {: RESULT = fcargs + "," + e; :}
+            | expression:e {: RESULT = e; :}
+;
+/* ifElse is an if-else statement that we can find *ONLY* inside a function declaration */
+/* It differs from an if-else that we can find as an argument of a call in the CALL SECTION, as it laso accepts IDENTIFIERs */
+ifElse ::= IF LPAREN condition:cond RPAREN expression:e1 ELSE expression:e2  {: RESULT = "(" + cond + "?" + e1 + ":" + e2 + ")"; :}
+;
+/* the condition of the if statement  */
+condition ::= expression:e condTail:tail {: RESULT = tail + e + ")"; :}
+;
+/* a condition can contain any expression before and after PREFIX/SUFFIX  */
+condTail ::= PREFIX expression:e {: RESULT = "(" + e + ")" + ".startsWith("; :}
+          |  SUFFIX expression:e {: RESULT = "(" + e + ")" + ".endsWith("; :}
+;
+
+/*    CALL SECTION      */
+
+/* these only refer to top-level function calls/expressions */
+/* the top-level function calls differ from the function calls inside a function definition, as top-level calls cannot contain any IDENTIFIER as an argument */
+/* any expression in the call section should also not contain any identifier */
+/* we can have 0 or more functionCall/expressions in the call section */
+funCalls ::= topLevelExpr:expr funCalls:otherCalls    {: RESULT = "\t\t System.out.println(" + expr + ");\n" + otherCalls; :}
+          | /* e  */ {: RESULT = ""; :}
+;
+/* at the top level we can have any expression  (not only function calls)*/
+topLevelExpr ::= callArguments:expr {: RESULT = expr; :}
+;
+/* functionCall consists of the function name, a left parenthesis and the functionCallTail  */
+functionCall ::= IDENTIFIER:funName LPAREN functionCallTail:tail {: RESULT = funName + "(" + tail; :}
+;
+/* functionCallTail consists of the function aguments (fcArguments) followed by a right parenthesis (RPAREN) */
+functionCallTail ::= fcArguments:args RPAREN {: RESULT = args + ")"; :}
+              |    RPAREN {: RESULT = ")"; :}
+;
+/* fcArguments consists of 1 or more callArguments separated by a COMMA */
+fcArguments ::= fcArguments:fcargs COMMA callArguments:arg  {: RESULT = fcargs + "," + arg; :}
+            | callArguments:arg {: RESULT = arg; :}
+;
+/* a callArguments can contain any compicated expression, but it can *NOT* contain an IDENTIFIER */
+/* for this reason we have created different "rules" from the calls that we can find inside a function declaration */
+callArguments ::= STRING_LITERAL:string {: RESULT = "\"" + string + "\""; :}
+              | functionCall:call {: RESULT = call; :}
+              | fcIfElse:ie {: RESULT = ie; :}
+              | callArguments:arg1 PLUS callArguments:arg2 {: RESULT = arg1 + " + " + arg2; :}
+;
+/* if statement that we can find as a callArgument. It can NOT contain an IDENTIFIER */
+fcIfElse ::= IF LPAREN fcCondition:cond RPAREN callArguments:e1 ELSE callArguments:e2  {: RESULT = "(" + cond + "?" + e1 + ":" + e2 + ")"; :}
+;
+/* fcCondition and fcCondTail are the same as condition and condTail but they cannot contain any IDENTIFIER */
+fcCondition ::= callArguments:arg fcCondTail:tail {: RESULT = tail + arg + ")"; :}
+;
+
+fcCondTail ::= PREFIX callArguments:arg {: RESULT = "(" + arg + ")" + ".startsWith("; :}
+            |  SUFFIX callArguments:arg {: RESULT = "(" + arg + ")" + ".endsWith("; :}
+;
